@@ -1,4 +1,7 @@
-![Баннер](https://i.ibb.co/ZpD1YnHy/Banner-Comfy.png)
+<p align="center">
+  <img src="https://raw.githubusercontent.com/Stamir36/ComfyFileSorter/refs/heads/main/.venv/github/BannerComfy.png" alt="Banner">
+</p>
+
 <div align="center">
 
 **Язык:** [🇺🇸 English](README.md) | 🇷🇺 Русский
@@ -10,7 +13,7 @@
 
 | Интерфейс галереи | Режим просмотра |
 | :---: | :---: |
-| ![Скриншот интерфейса](https://i.ibb.co/ccpw3R3t/Screen-1.png) | ![Скриншот просмотра](https://i.ibb.co/gZLvC4Yf/Screen-2.png) |
+| ![Interface Screenshot](https://raw.githubusercontent.com/Stamir36/ComfyFileSorter/refs/heads/main/.venv/github/Screen_1.png) | ![Viewer Screenshot](https://raw.githubusercontent.com/Stamir36/ComfyFileSorter/refs/heads/main/.venv/github/Screen_2.png) |
 
 ## ✨ Возможности
 

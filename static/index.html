@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="ru" class="dark">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Comfy File Sorter</title>
+    <link rel="icon" href="/favicon.png" type="image/png">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                container: { center: true, padding: '2rem', screens: { '2xl': '1600px' } },
+                extend: {
+                    colors: {
+                        border: "hsl(var(--border))",
+                        input: "hsl(var(--input))",
+                        ring: "hsl(var(--ring))",
+                        background: "hsl(var(--background))",
+                        foreground: "hsl(var(--foreground))",
+                        primary: { DEFAULT: "hsl(var(--primary))", foreground: "hsl(var(--primary-foreground))" },
+                        secondary: { DEFAULT: "hsl(var(--secondary))", foreground: "hsl(var(--secondary-foreground))" },
+                        destructive: { DEFAULT: "hsl(var(--destructive))", foreground: "hsl(var(--destructive-foreground))" },
+                        muted: { DEFAULT: "hsl(var(--muted))", foreground: "hsl(var(--muted-foreground))" },
+                        accent: { DEFAULT: "hsl(var(--accent))", foreground: "hsl(var(--accent-foreground))" },
+                        popover: { DEFAULT: "hsl(var(--popover))", foreground: "hsl(var(--popover-foreground))" },
+                        card: { DEFAULT: "hsl(var(--card))", foreground: "hsl(var(--card-foreground))" },
+                        folder: { DEFAULT: 'hsl(var(--folder-bg))', hover: 'hsl(var(--folder-hover))' }
+                    },
+                    borderRadius: { lg: "var(--radius)", md: "calc(var(--radius) - 2px)", sm: "calc(var(--radius) - 4px)" }
+                },
+            },
+        }
+    </script>
+    <style>
+        @layer base {
+            :root {
+                --background: 0 0% 98%; --foreground: 220 15% 15%;
+                --card: 0 0% 100%; --card-foreground: 220 15% 15%;
+                --popover: 0 0% 100%; --popover-foreground: 220 15% 15%;
+                --primary: 220 15% 15%; --primary-foreground: 0 0% 98%;
+                --secondary: 220 8% 96%; --secondary-foreground: 220 15% 15%;
+                --muted: 220 8% 94%; --muted-foreground: 220 10% 45%;
+                --accent: 220 8% 92%; --accent-foreground: 220 15% 15%;
+                --destructive: 0 84.2% 60.2%; --destructive-foreground: 0 0% 98%;
+                --border: 220 8% 88%; --input: 220 8% 92%; --ring: 220 15% 15%;
+                --radius: 0.75rem;
+                --folder-bg: 220 8% 94%; --folder-hover: 220 8% 88%;
+                --gallery-shadow: 220 10% 20%;
+                --shadow-gallery: 0 4px 12px hsl(var(--gallery-shadow) / 0.05);
+                --shadow-gallery-hover: 0 8px 24px hsl(var(--gallery-shadow) / 0.1);
+            }
+            .dark {
+                --background: 222 15% 8%; --foreground: 220 15% 85%;
+                --card: 222 15% 10%; --card-foreground: 220 15% 85%;
+                --popover: 222 15% 10%; --popover-foreground: 220 15% 85%;
+                --primary: 220 15% 85%; --primary-foreground: 222 15% 10%;
+                --secondary: 222 10% 12%; --secondary-foreground: 220 15% 85%;
+                --muted: 222 10% 14%; --muted-foreground: 220 10% 55%;
+                --accent: 222 10% 16%; --accent-foreground: 220 15% 85%;
+                --destructive: 0 62.8% 50%; --destructive-foreground: 0 0% 98%;
+                --border: 222 10% 18%; --input: 222 10% 16%; --ring: 220 15% 85%;
+                --folder-bg: 222 10% 12%; --folder-hover: 222 10% 16%;
+                --gallery-shadow: 0 0% 0%;
+                --shadow-gallery: 0 4px 12px hsl(var(--gallery-shadow) / 0.2);
+                --shadow-gallery-hover: 0 8px 24px hsl(var(--gallery-shadow) / 0.3);
+            }
+        }
+        body { font-family: ui-sans-serif, system-ui, -apple-system, sans-serif; }
+        .dark select option { background-color: hsl(var(--card)); color: hsl(var(--foreground)); }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: hsl(var(--muted-foreground) / 0.3); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: hsl(var(--muted-foreground) / 0.5); }
+        
+        input[type=range] { height: 0.3rem; background-color: rgba(255,255,255,0.2); border-radius: 99px; -webkit-appearance: none; cursor: pointer; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; border-radius: 9999px; background-color: white; transition: transform 0.1s; }
+        input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+        .loader { border: 2px solid hsl(var(--muted)); border-top: 2px solid hsl(var(--primary)); border-radius: 50%; width: 20px; height: 20px; animation: spin 1s linear infinite; display: inline-block; vertical-align: middle; }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+        .glass-panel { background: rgba(20, 20, 20, 0.6); backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3); }
+
+        .immersive-active #modalSidebar { width: 0px !important; opacity: 0; padding: 0; overflow: hidden; border: none; }
+        .immersive-active #immersiveControls { display: flex; opacity: 1; pointer-events: auto; transform: translateY(0); }
+        
+        #modalSidebar { transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease; will-change: width; }
+        #modalImageContainer { transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
+
+        /* Toast Animation */
+        .toast-enter { transform: translateY(20px); opacity: 0; }
+        .toast-enter-active { transform: translateY(0); opacity: 1; transition: all 0.3s ease-out; }
+        .toast-exit { transform: translateY(0); opacity: 1; }
+        .toast-exit-active { transform: translateY(20px); opacity: 0; transition: all 0.3s ease-in; }
+
+        /* Prompt Syntax Highlight */
+        .syntax-lora { color: #f472b6; font-weight: 600; } /* Pink */
+        .syntax-weight { color: #60a5fa; } /* Blue */
+        .syntax-break { color: #ef4444; font-weight: bold; } /* Red */
+    </style>
+</head>
+<body class="bg-background text-foreground antialiased transition-colors duration-300 flex flex-col min-h-screen">
+    
+    <div id="toastContainer" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-[100] flex flex-col gap-2 pointer-events-none"></div>
+
+    <header class="bg-card/80 backdrop-blur-md border-b border-border sticky top-0 z-40">
+        <div class="w-full max-w-[95%] mx-auto px-6 py-4">
+            <div class="flex items-center justify-between">
+                <div id="logoBtn" class="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity">
+                    <img src="/favicon.png" class="h-9 w-9 rounded-lg shadow-sm" alt="Logo">
+                    <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-transparent" data-i18n="galleryTitle">Галерея Генераций</h1>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="helpBtn" class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent h-9 w-9 tooltip" title="Горячие клавиши">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    </button>
+                    <button id="fullscreenBtn" class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent h-9 w-9 tooltip" title="Полный экран (F11)">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 4l-5-5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
+                    </button>
+                    <button id="themeToggle" class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent h-9 w-9">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+                    </button>
+                    <div class="w-px h-6 bg-border mx-1"></div>
+                    <button id="mergerBtn" class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent h-9 px-3 gap-2">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+                        <span data-i18n="mergerBtn">Слияние</span>
+                    </button>
+                    <button id="settingsBtn" class="inline-flex items-center justify-center rounded-md text-sm font-medium transition-colors hover:bg-accent h-9 px-3 gap-2">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                        <span data-i18n="settingsBtn">Настройки</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main id="mainLayout" class="w-full max-w-[95%] mx-auto px-6 py-8 flex-1">
+        <div class="mb-6">
+            <nav class="flex mb-4" aria-label="Breadcrumb"><ol id="breadcrumbs" class="inline-flex items-center space-x-1 md:space-x-2 rtl:space-x-reverse"></ol></nav>
+            <div class="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                <div>
+                    <h2 id="currentPathTitle" class="text-3xl font-bold tracking-tight text-foreground">Галерея</h2>
+                    <div id="galleryStats" class="flex items-center gap-2 text-muted-foreground mt-1 text-sm"><span class="loader"></span> <span data-i18n="loading">Загрузка...</span></div>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div class="flex items-center gap-2 bg-card border border-border rounded-lg p-1 shadow-sm">
+                        <div class="flex items-center gap-2 px-2">
+                             <select id="filterType" class="h-8 bg-transparent border-none text-sm font-medium text-foreground focus:ring-0 cursor-pointer outline-none">
+                                <option value="all" data-i18n="filterAll">Все файлы</option>
+                                <option value="image" data-i18n="filterImage">Только фото</option>
+                                <option value="video" data-i18n="filterVideo">Только видео</option>
+                            </select>
+                        </div>
+                        <div class="w-px h-6 bg-border mx-1"></div>
+                        <div class="flex items-center gap-2 px-2">
+                             <button id="favFilterBtn" class="p-1.5 rounded-md transition-all text-muted-foreground hover:text-red-500 tooltip" title="Только избранное">
+                                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
+                            </button>
+                        </div>
+                        <div class="w-px h-6 bg-border mx-1"></div>
+                        <div class="flex items-center gap-2 px-2">
+                            <svg class="h-4 w-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                            <input id="thumbSize" type="range" min="100" max="400" step="10" value="200" class="w-24" style="background-color: hsl(var(--secondary));">
+                        </div>
+                        <div class="flex items-center gap-2 px-2">
+                            <button id="fitToggleBtn" class="p-1.5 hover:bg-accent rounded-md transition-colors tooltip" title="Заполнить / Вместить">
+                                <svg id="fitIconCover" class="h-4 w-4 text-muted-foreground" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 16v4m0 0h4m-4-8v0m0 0v0m8-8h4m-4 16h4m-4-16v0m0 0v0M20 8V4m0 12v4" /></svg>
+                                <svg id="fitIconContain" class="h-4 w-4 text-foreground hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                            </button>
+                        </div>
+                        <div class="w-px h-6 bg-border mx-1"></div>
+                        <select id="sortBy" class="h-8 bg-transparent border-none text-sm font-medium text-foreground focus:ring-0 cursor-pointer outline-none">
+                            <option value="mtime" data-i18n="sortDate">По дате</option>
+                            <option value="name" data-i18n="sortName">По имени</option>
+                            <option value="size" data-i18n="sortSize">По размеру</option>
+                        </select>
+                        <button id="sortDirBtn" class="p-1.5 hover:bg-accent rounded-md transition-colors">
+                            <svg id="sortDirIcon" class="h-4 w-4 text-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4h13M3 8h9m-9 4h6m4 0l4-4m0 0l4 4m-4-4v12"></path></svg>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div id="gallery" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4 min-h-[200px] pb-24"></div>
+        
+        <div class="fixed bottom-8 right-8 flex items-end gap-3 z-30 pointer-events-none">
+            <div id="searchWrapper" class="glass-panel rounded-full flex items-center px-1 h-12 shadow-xl transition-transform duration-300 w-64 focus-within:w-96 mr-2 pointer-events-auto">
+                <div class="pl-3 pr-2 text-white/60">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                </div>
+                <input id="searchInput" type="text" class="bg-transparent border-none text-white placeholder-white/40 text-sm w-full focus:ring-0 h-full px-0 outline-none" data-i18n-placeholder="searchPlaceholder" placeholder="Поиск...">
+            </div>
+
+            <div class="flex flex-col gap-3 transition-transform duration-300 pointer-events-auto" id="fabContainer">
+                <button id="fabRandom" class="glass-panel text-white p-3 rounded-full hover:bg-white/20 transition-all shadow-xl tooltip group relative">
+                    <div class="absolute right-full mr-2 top-1/2 -translate-y-1/2 bg-black/80 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none" data-i18n="randomBtn">Мне повезет!</div>
+                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path></svg>
+                </button>
+                
+                <button id="fabTop" class="glass-panel text-white p-3 rounded-full hover:bg-white/20 transition-all shadow-xl group relative">
+                    <div class="absolute right-full mr-2 top-1/2 -translate-y-1/2 bg-black/80 text-white text-xs px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none" data-i18n="topBtn">Наверх</div>
+                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 10l7-7m0 0l7 7m-7-7v18"></path></svg>
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <footer class="border-t border-border py-6 bg-card/50 mt-auto">
+        <div class="container mx-auto flex flex-col md:flex-row justify-between items-center gap-4 text-sm text-muted-foreground">
+            <p>© 2025 Comfy File Sorter</p>
+            <div class="flex items-center gap-2">
+                <span>Created by <span class="font-semibold text-foreground">Stamir</span></span>
+                <span class="mx-1">•</span>
+                <a href="https://github.com/Stamir36" target="_blank" class="hover:text-primary transition-colors flex items-center gap-1">GitHub</a>
+            </div>
+        </div>
+    </footer>
+
+    <div id="mergerModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4 animate-in fade-in duration-200">
+         <div class="bg-background border border-border rounded-xl shadow-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto flex flex-col">
+            <div class="flex items-center justify-between p-6 border-b border-border">
+                <div class="flex items-center gap-3"><div class="bg-primary/10 p-2 rounded-lg"><svg class="h-5 w-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg></div><h2 class="text-lg font-semibold" data-i18n="mergerTitle">Слияние файлов</h2></div><button id="closeMerger" class="rounded-sm opacity-70 hover:opacity-100"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+            </div>
+            <div class="p-6 space-y-6 bg-muted/20 flex-1">
+                <div class="rounded-xl border border-border bg-card shadow-sm p-5"><h3 class="text-sm font-semibold uppercase text-muted-foreground mb-3" data-i18n="sourceFolders">1. Откуда берем файлы</h3><div id="mergerSourcesList" class="space-y-2 mb-4"><div class="text-sm text-muted-foreground italic empty-msg" data-i18n="emptySources">Папки не выбраны</div></div><div class="flex gap-2"><button id="addSourceBtn" class="inline-flex items-center justify-center rounded-md text-sm font-medium border border-dashed border-border bg-transparent hover:bg-accent h-9 px-4 gap-2 w-full"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg> <span data-i18n="addFolder">Добавить папку</span></button><button id="clearSourcesBtn" class="inline-flex items-center justify-center rounded-md text-sm font-medium text-destructive hover:bg-destructive/10 h-9 px-3" data-i18n="clear">Очистить</button></div></div>
+                <div class="rounded-xl border border-border bg-card shadow-sm p-5 space-y-4"><h3 class="text-sm font-semibold uppercase text-muted-foreground" data-i18n="destination">2. Куда и как сохраем</h3><div class="grid grid-cols-1 md:grid-cols-2 gap-4"><div class="space-y-2"><label class="text-sm font-medium" data-i18n="destFolder">Папка назначения</label><div class="flex gap-2"><input id="mergerDestInput" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" data-i18n-placeholder="destPlaceholder"><button id="mergerSelectDest" class="border border-input bg-background hover:bg-accent h-10 px-3 rounded-md text-sm">...</button></div></div><div class="space-y-2"><label class="text-sm font-medium" data-i18n="prefixLabel">Префикс имени</label><input id="mergerPrefixInput" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" data-i18n-placeholder="prefixPlaceholder"><p class="text-[10px] text-muted-foreground" data-i18n="prefixHint">Файлы будут: Art_000001.png...</p></div></div><div class="flex items-center space-x-2 pt-2"><input type="checkbox" id="moveFilesCheck" class="h-4 w-4 rounded border-input bg-background text-primary focus:ring-primary"><label for="moveFilesCheck" class="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70" data-i18n="moveFiles">Удалять исходные файлы (Перемещение)</label></div></div>
+                <div id="mergerStatusArea" class="hidden rounded-xl border border-blue-500/20 bg-blue-500/10 p-4 text-sm text-blue-400 flex items-center gap-3"><span class="loader h-4 w-4 border-2"></span> <span id="mergerStatusText" data-i18n="processing">Обработка...</span></div>
+            </div>
+            <div class="p-6 border-t border-border flex justify-end gap-2 bg-background"><button id="startMergeBtn" class="bg-primary text-primary-foreground hover:bg-primary/90 h-11 px-8 rounded-lg text-base font-medium shadow-md transition-transform active:scale-95" data-i18n="startMerge">Запустить слияние</button></div>
+        </div>
+    </div>
+
+    <div id="settingsModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4 animate-in fade-in duration-200">
+        <div class="bg-background border border-border rounded-xl shadow-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto flex flex-col">
+             <div class="flex items-center justify-between p-6 border-b border-border"><h2 class="text-lg font-semibold" data-i18n="settingsTitle">Настройки</h2><button id="closeSettings" class="rounded-sm opacity-70 hover:opacity-100"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button></div>
+            <div class="p-6 space-y-6 bg-muted/20">
+                 <div class="rounded-xl border border-border bg-card shadow-sm p-6 space-y-4"><h3 class="text-lg font-semibold" data-i18n="paths">Пути к папкам</h3><div class="space-y-2"><label class="text-sm font-medium" data-i18n="outputDir">Папка вывода</label><div class="flex gap-2"><input id="outputDirInput" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"><button id="selectOutputDir" class="border border-input bg-background hover:bg-accent h-10 px-4 rounded-md text-sm" data-i18n="browse">Обзор</button></div></div><div class="space-y-2"><label class="text-sm font-medium" data-i18n="copiesDir">Папка копий</label><div class="flex gap-2"><input id="copiesDirInput" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"><button id="selectCopiesDir" class="border border-input bg-background hover:bg-accent h-10 px-4 rounded-md text-sm" data-i18n="browse">Обзор</button></div></div></div>
+                <div class="rounded-xl border border-border bg-card shadow-sm p-6 space-y-4"><h3 class="text-lg font-semibold" data-i18n="display">Отображение</h3><div class="space-y-3"><div class="flex justify-between"><label class="text-sm font-medium" data-i18n="thumbSize">Размер превью</label><span id="modalThumbValue" class="text-sm text-muted-foreground">200px</span></div><input id="modalThumbSize" type="range" min="100" max="400" step="10" value="200" class="w-full" style="background-color: hsl(var(--secondary));"></div><div class="grid grid-cols-2 gap-4"><div class="space-y-2"><label class="text-sm font-medium" data-i18n="sorting">Сортировка</label><select id="modalSortBy" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"><option value="mtime" data-i18n="sortDate">Дате</option><option value="name" data-i18n="sortName">Имени</option><option value="size" data-i18n="sortSize">Размеру</option></select></div><div class="space-y-2"><label class="text-sm font-medium" data-i18n="order">Порядок</label><select id="modalSortDir" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"><option value="desc" data-i18n="desc">По убыванию</option><option value="asc" data-i18n="asc">По возрастанию</option></select></div></div></div>
+                <div class="rounded-xl border border-border bg-card shadow-sm p-6 grid grid-cols-2 gap-6">
+                    <div class="space-y-2"><label class="text-sm font-medium" data-i18n="theme">Тема</label><select id="themeSelect" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></div>
+                    <div class="space-y-2"><label class="text-sm font-medium" data-i18n="lang">Язык</label><select id="langSelect" class="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"><option value="ru">Русский</option><option value="en">English</option></select></div>
+                    <div class="col-span-2 pt-2 border-t border-border"><button id="clearCacheBtn" class="text-xs text-destructive hover:underline" data-i18n="clearCache">Очистить кэш метаданных</button></div>
+                </div>
+            </div>
+            <div class="p-6 border-t border-border flex justify-end gap-2"><button id="cancelSettings" class="border border-input bg-background hover:bg-accent h-10 px-4 rounded-md text-sm font-medium" data-i18n="cancel">Отмена</button><button id="saveSettings" class="bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 rounded-md text-sm font-medium" data-i18n="save">Сохранить</button></div>
+        </div>
+    </div>
+
+    <div id="cacheConfirmModal" class="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm hidden flex items-center justify-center animate-in fade-in duration-200"><div class="glass-panel bg-background/80 dark:bg-[#1a1a1a]/90 rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4 border border-white/10 transform scale-100 transition-all"><div class="flex flex-col items-center text-center space-y-4"><div class="h-12 w-12 rounded-full bg-yellow-500/10 flex items-center justify-center text-yellow-500 mb-2"><svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></div><h3 class="text-xl font-bold text-foreground" data-i18n="clearCacheTitle">Очистить кэш?</h3><p class="text-muted-foreground text-sm" data-i18n="clearCacheMsg">Программа пересканирует все файлы заново. Это может занять время.</p><div class="flex gap-3 w-full pt-2"><button id="cancelCacheBtn" class="flex-1 h-10 rounded-xl font-medium bg-secondary hover:bg-secondary/80 transition-colors text-sm" data-i18n="cancel">Отмена</button><button id="confirmCacheBtn" class="flex-1 h-10 rounded-xl font-medium bg-yellow-500 text-white hover:bg-yellow-600 transition-colors text-sm shadow-lg" data-i18n="clearBtn">Очистить</button></div></div></div></div>
+
+    <div id="helpModal" class="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm hidden flex items-center justify-center p-4 animate-in fade-in duration-200">
+        <div class="bg-background border border-border rounded-xl shadow-lg max-w-md w-full">
+            <div class="flex items-center justify-between p-6 border-b border-border"><h2 class="text-lg font-semibold" data-i18n="help">Справка</h2><button id="closeHelp" class="rounded-sm opacity-70 hover:opacity-100"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button></div>
+            <div class="p-6 space-y-4 text-sm">
+                <div class="flex justify-between"><span>← / →</span> <span class="text-muted-foreground">Предыдущее / Следующее фото</span></div>
+                <div class="flex justify-between"><span>F</span> <span class="text-muted-foreground">Режим погружения (Immersive)</span></div>
+                <div class="flex justify-between"><span>Esc</span> <span class="text-muted-foreground">Закрыть / Выйти</span></div>
+                <div class="flex justify-between"><span>Del</span> <span class="text-muted-foreground">Удалить файл</span></div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="deleteConfirmModal" class="fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm hidden flex items-center justify-center animate-in fade-in duration-200"><div class="glass-panel bg-background/80 dark:bg-[#1a1a1a]/90 rounded-2xl shadow-2xl p-6 max-w-md w-full mx-4 border border-white/10 transform scale-100 transition-all"><div class="flex flex-col items-center text-center space-y-4"><div class="h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center text-destructive mb-2"><svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></div><h3 class="text-xl font-bold text-foreground" data-i18n="delTitle">Удалить файл?</h3><p class="text-muted-foreground text-sm"><span data-i18n="delMsg">Вы уверены?</span> <span id="delFileName" class="font-mono text-foreground bg-muted/50 px-1 py-0.5 rounded">file.png</span>?</p><div class="flex gap-3 w-full pt-2"><button id="cancelDeleteBtn" class="flex-1 h-10 rounded-xl font-medium bg-secondary hover:bg-secondary/80 transition-colors text-sm" data-i18n="cancel">Отмена</button><button id="confirmDeleteBtn" class="flex-1 h-10 rounded-xl font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 transition-colors text-sm shadow-lg shadow-destructive/20" data-i18n="delBtn">Удалить</button></div></div></div></div>
+
+    <div id="imageModal" class="fixed inset-0 z-50 bg-black/95 backdrop-blur-md hidden flex animate-in fade-in duration-300 overflow-hidden">
+        <div id="modalImageContainer" class="flex-1 relative flex items-center justify-center p-4 group overflow-hidden select-none h-full w-full">
+            <img id="modalImage" src="" class="hidden max-w-full max-h-full object-contain transition-opacity duration-300 ease-in-out cursor-grab shadow-2xl opacity-0" style="transform: scale(1);">
+            <div id="videoContainer" class="hidden relative max-w-full max-h-full flex items-center justify-center">
+                <video id="modalVideo" class="max-w-full max-h-[85vh] rounded-lg shadow-2xl" loop playsinline></video>
+                <div id="videoControls" class="absolute bottom-6 left-1/2 -translate-x-1/2 glass-panel rounded-full px-4 py-2 flex items-center gap-4 text-white shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300 w-[400px] max-w-[90vw]"><button id="vidPlayBtn" class="focus:outline-none hover:text-white/80 transition-colors"><svg id="iconPlay" class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg><svg id="iconPause" class="h-6 w-6 hidden" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg></button><span id="vidTime" class="text-xs font-mono font-medium w-10 text-right">0:00</span><div class="flex-1 flex items-center relative group/progress"><input id="vidProgress" type="range" min="0" max="100" value="0" class="w-full h-1 bg-white/30 rounded-full cursor-pointer accent-white"></div><div class="flex items-center gap-2 group/vol"><button id="vidMuteBtn" class="hover:text-white/80"><svg id="iconVolOn" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path></svg><svg id="iconVolOff" class="h-5 w-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"></path></svg></button><input id="vidVolume" type="range" min="0" max="1" step="0.1" value="1" class="w-0 group-hover/vol:w-16 transition-all duration-300 h-1 bg-white/30 rounded-full cursor-pointer accent-white overflow-hidden"></div></div>
+            </div>
+
+            <button id="prevBtn" class="absolute left-6 p-3 rounded-full bg-black/20 text-white hover:bg-white/20 backdrop-blur-md transition-all hover:scale-110"><svg class="h-8 w-8 drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 19l-7-7 7-7"></path></svg></button>
+            <button id="nextBtn" class="absolute right-6 p-3 rounded-full bg-black/20 text-white hover:bg-white/20 backdrop-blur-md transition-all hover:scale-110"><svg class="h-8 w-8 drop-shadow-lg" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5l7 7-7 7"></path></svg></button>
+
+             <div id="bottomControlsWrapper" class="absolute bottom-8 left-1/2 -translate-x-1/2 flex items-center gap-3 z-20 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                <div id="zoomControls" class="flex items-center gap-1 bg-black/50 backdrop-blur-md rounded-full px-2 py-1.5 text-white border border-white/10 shadow-2xl">
+                    <button id="zoomOut" class="p-2 hover:bg-white/20 rounded-full"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path></svg></button>
+                    <span id="zoomLevel" class="text-xs font-mono w-12 text-center font-medium tracking-wider">100%</span>
+                    <button id="zoomIn" class="p-2 hover:bg-white/20 rounded-full"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg></button>
+                    <div class="w-px h-4 bg-white/20 mx-1"></div>
+                    <button id="zoomReset" class="px-3 text-xs font-medium hover:text-white/80" data-i18n="reset">Сброс</button>
+                </div>
+                <div id="immersiveControls" class="hidden glass-panel rounded-full px-2 py-1.5 items-center gap-2 text-white shadow-2xl transition-all duration-500">
+                    <button id="immSlide" class="p-2 hover:bg-white/20 rounded-full tooltip" title="Слайд-шоу">
+                         <svg id="immSlideIconPlay" class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                         <svg id="immSlideIconPause" class="h-5 w-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    </button>
+                    <div class="w-px h-4 bg-white/20 mx-1"></div>
+                    <button id="immCopy" class="p-2 hover:bg-white/20 rounded-full tooltip" title="Копировать"><svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg></button>
+                    <button id="immDel" class="p-2 hover:bg-red-500/50 text-red-400 hover:text-white rounded-full tooltip" title="Удалить"><svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
+                    <div class="w-px h-4 bg-white/20 mx-1"></div>
+                    <button id="immExit" class="px-3 py-1 text-xs font-medium hover:bg-white/20 rounded-full flex items-center gap-1"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg> <span data-i18n="info">Инфо</span></button>
+                </div>
+            </div>
+        </div>
+
+        <div id="modalSidebar" class="w-[400px] bg-background border-l border-border flex flex-col shadow-2xl h-full z-10 flex-shrink-0 overflow-hidden">
+            <div class="flex items-center justify-between p-4 border-b border-border bg-muted/10 min-h-[65px]">
+                <h3 id="modalTitle" class="font-medium truncate pr-4 text-sm text-foreground/80">Filename.png</h3>
+                <div class="flex items-center gap-2">
+                    <button id="toggleImmersiveBtn" class="glass-panel px-3 py-1.5 rounded-full flex items-center gap-2 text-xs font-medium hover:bg-white/20 transition-all group">
+                        <svg class="h-3.5 w-3.5 text-foreground/80 group-hover:text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 4l-5-5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"></path></svg>
+                        <span class="text-foreground/80 group-hover:text-white" data-i18n="immersive">Погружение</span>
+                    </button>
+                    <button id="favoriteBtn" class="text-muted-foreground hover:text-red-500 transition-colors p-1.5 rounded-md">
+                        <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
+                    </button>
+                    <button id="closeModal" class="text-muted-foreground hover:text-foreground hover:bg-accent p-1.5 rounded-md"><svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg></button>
+                </div>
+            </div>
+
+            <div class="p-4 border-b border-border bg-card/50 grid grid-cols-3 gap-2 min-w-[400px]">
+                <button id="copyGenBtn" class="col-span-1 inline-flex items-center justify-center rounded-md text-xs font-medium bg-primary/10 text-primary hover:bg-primary/20 h-8 px-2 gap-1.5"><svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg> <span data-i18n="copyGen">Данные</span></button>
+                <button id="copyBtn" class="col-span-1 inline-flex items-center justify-center rounded-md text-xs font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-2 gap-1.5"><svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg> <span data-i18n="copyFile">Копия</span></button>
+                <button id="downloadBtn" class="col-span-1 inline-flex items-center justify-center rounded-md text-xs font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-2 gap-1.5"><svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg> <span data-i18n="download">Скачать</span></button>
+                <button id="openExplorerBtn" class="col-span-2 inline-flex items-center justify-center rounded-md text-xs font-medium border border-input bg-background hover:bg-accent hover:text-accent-foreground h-8 px-2 gap-1.5"><svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z"></path></svg> <span data-i18n="inFolder">В папке</span></button>
+                <button id="deleteBtn" class="col-span-1 inline-flex items-center justify-center rounded-md text-xs font-medium bg-destructive text-destructive-foreground hover:bg-destructive/90 h-8 px-2 gap-1.5 shadow-sm"><svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg> <span data-i18n="delete">Удалить</span></button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-5 space-y-6 custom-scrollbar min-w-[400px]">
+                <div id="promptContainer" class="space-y-4">
+                    <div class="rounded-lg border border-border bg-muted/30 p-3 space-y-2 transition-colors hover:border-primary/20">
+                        <div class="flex justify-between items-center"><span class="text-[10px] font-bold uppercase text-muted-foreground tracking-widest" data-i18n="prompt">PROMPT</span><button id="copyPos" class="text-muted-foreground hover:text-primary p-1 rounded hover:bg-background"><svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg></button></div>
+                        <p id="valPositive" class="text-xs text-foreground/90 whitespace-pre-wrap leading-relaxed font-sans">...</p>
+                    </div>
+                    <div class="rounded-lg border border-border bg-muted/30 p-3 space-y-2 transition-colors hover:border-primary/20">
+                         <div class="flex justify-between items-center"><span class="text-[10px] font-bold uppercase text-muted-foreground tracking-widest" data-i18n="negative">NEGATIVE</span><button id="copyNeg" class="text-muted-foreground hover:text-primary p-1 rounded hover:bg-background"><svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg></button></div>
+                        <p id="valNegative" class="text-xs text-foreground/90 whitespace-pre-wrap leading-relaxed font-sans">...</p>
+                    </div>
+                </div>
+                <div class="h-px bg-border"></div>
+                <div id="paramsContainer" class="grid grid-cols-2 gap-y-5 gap-x-4">
+                    <div class="meta-field"><p class="text-[10px] text-muted-foreground font-medium uppercase mb-1">Model</p><div id="valModel" class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold border-transparent bg-secondary text-secondary-foreground truncate max-w-full">-</div></div>
+                    <div class="meta-field"><p class="text-[10px] text-muted-foreground font-medium uppercase mb-1">Sampler</p><p id="valSampler" class="text-xs font-medium truncate text-foreground">-</p></div>
+                    <div class="meta-field"><p class="text-[10px] text-muted-foreground font-medium uppercase mb-1">Steps</p><p id="valSteps" class="text-xs font-medium text-foreground">-</p></div>
+                    <div class="meta-field"><p class="text-[10px] text-muted-foreground font-medium uppercase mb-1">CFG Scale</p><p id="valCfg" class="text-xs font-medium text-foreground">-</p></div>
+                    <div class="col-span-2 meta-field"><p class="text-[10px] text-muted-foreground font-medium uppercase mb-1">Seed</p><div class="flex items-center gap-2 group/seed"><p id="valSeed" class="font-mono text-xs font-medium text-foreground">-</p><button id="copySeed" class="text-muted-foreground opacity-0 group-hover/seed:opacity-100 hover:text-primary"><svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg></button></div></div>
+                    <div><p class="text-[10px] text-muted-foreground font-medium uppercase mb-1">Size / Duration</p><p id="valSize" class="text-xs font-medium text-foreground">-</p></div>
+                    <div><p class="text-[10px] text-muted-foreground font-medium uppercase mb-1">Created</p><p id="valDate" class="text-xs font-medium text-foreground">-</p></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <template id="tpl-folder-card"><div class="group cursor-pointer bg-folder hover:bg-folder-hover rounded-xl p-4 transition-all duration-200 hover:shadow-gallery-hover border border-border/50 h-full flex flex-col items-center justify-center aspect-square relative"><svg class="h-12 w-12 text-muted-foreground group-hover:text-foreground mb-3 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 5a2 2 0 012-2h4a2 2 0 012 2v2H8V5z"></path></svg><h3 class="font-medium text-sm text-foreground mb-1 truncate w-full text-center px-2">Name</h3><p class="text-xs text-muted-foreground"><span class="count">0</span> <span data-i18n="files">файлов</span></p></div></template>
+    <template id="tpl-image-card">
+        <div class="group cursor-pointer bg-card rounded-xl overflow-hidden border border-border/50 hover:shadow-gallery-hover transition-all duration-200 relative aspect-square">
+            <div class="absolute inset-0 flex items-center justify-center bg-muted/50 z-0">
+                <span class="loader border-muted-foreground/30 border-t-foreground h-6 w-6"></span>
+            </div>
+            <img loading="lazy" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 bg-transparent relative z-10 opacity-0" alt="">
+            <div class="video-indicator hidden absolute top-2 right-2 bg-black/50 backdrop-blur-sm p-1.5 rounded-full text-white z-20"><svg class="h-3 w-3" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>
+            <div class="favorite-indicator hidden absolute top-2 left-2 bg-red-500/80 backdrop-blur-sm p-1.5 rounded-full text-white z-20 shadow-sm"><svg class="h-3 w-3" fill="currentColor" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg></div>
+            <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-end p-3 z-20"><p class="text-sm text-white/90 truncate w-full font-medium drop-shadow-md name-label">Filename</p></div>
+        </div>
+    </template>
+    <template id="tpl-empty-state"><div class="col-span-full flex flex-col items-center justify-center py-20 text-center text-muted-foreground"><div class="bg-muted/30 p-6 rounded-full mb-4"><svg class="h-12 w-12 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg></div><h3 class="text-lg font-medium text-foreground" data-i18n="emptyTitle">Папка пуста</h3><p class="text-sm" data-i18n="emptyDesc">Здесь пока нет изображений или видео</p></div></template>
+
+    <script src="/static/locales.js"></script>
+    <script src="/static/app.js"></script>
+    <script>
+        const theme = localStorage.getItem('cfs-theme') || 'system';
+        if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) { document.documentElement.classList.add('dark'); } else { document.documentElement.classList.remove('dark'); }
+    </script>
+</body>
+</html>

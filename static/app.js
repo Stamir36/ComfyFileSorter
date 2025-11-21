@@ -21,18 +21,24 @@
         searchTimeout: null,
         currentLang: localStorage.getItem('cfs-lang') || 'ru',
         favorites: new Set(),
-        fitMode: localStorage.getItem('cfs-fit') || 'cover' // 'cover' or 'contain'
+        fitMode: localStorage.getItem('cfs-fit') || 'cover',
+        contextMenuTargetIdx: -1,
+        showFilmstrip: localStorage.getItem('cfs-filmstrip') !== 'false',
+        // Filmstrip drag state
+        isFilmstripDragging: false,
+        filmstripStartX: 0,
+        filmstripScrollLeft: 0
     };
 
     const el = {
         mainLayout: $("#mainLayout"), gallery: $("#gallery"), search: $("#searchInput"), searchWrapper: $("#searchWrapper"),
         stats: $("#galleryStats"), pathTitle: $("#currentPathTitle"), breadcrumbs: $("#breadcrumbs"),
         thumbSize: $("#thumbSize"), sortBy: $("#sortBy"), sortDirBtn: $("#sortDirBtn"),
-        filterType: $("#filterType"), fitToggleBtn: $("#fitToggleBtn"), fitIconCover: $("#fitIconCover"), fitIconContain: $("#fitIconContain"),
+        segmentBtns: $$(".segment-btn"),
+        fitToggleBtn: $("#fitToggleBtn"), fitIconCover: $("#fitIconCover"), fitIconContain: $("#fitIconContain"),
         favFilterBtn: $("#favFilterBtn"),
         settingsBtn: $("#settingsBtn"), mergerBtn: $("#mergerBtn"), themeToggle: $("#themeToggle"), logoBtn: $("#logoBtn"),
         fullscreenBtn: $("#fullscreenBtn"), helpBtn: $("#helpBtn"),
-        // Settings
         settingsModal: $("#settingsModal"), closeSettings: $("#closeSettings"),
         cancelSettings: $("#cancelSettings"), saveSettings: $("#saveSettings"),
         outputDirInput: $("#outputDirInput"), copiesDirInput: $("#copiesDirInput"),
@@ -40,42 +46,41 @@
         themeSelect: $("#themeSelect"), langSelect: $("#langSelect"), modalThumbSize: $("#modalThumbSize"),
         modalThumbValue: $("#modalThumbValue"), modalSortBy: $("#modalSortBy"), modalSortDir: $("#modalSortDir"),
         clearCacheBtn: $("#clearCacheBtn"), cacheConfirmModal: $("#cacheConfirmModal"), confirmCacheBtn: $("#confirmCacheBtn"), cancelCacheBtn: $("#cancelCacheBtn"),
-        // Merger
         mergerModal: $("#mergerModal"), closeMerger: $("#closeMerger"),
         addSourceBtn: $("#addSourceBtn"), clearSourcesBtn: $("#clearSourcesBtn"),
         mergerSourcesList: $("#mergerSourcesList"), mergerDestInput: $("#mergerDestInput"),
         mergerSelectDest: $("#mergerSelectDest"), mergerPrefixInput: $("#mergerPrefixInput"),
         startMergeBtn: $("#startMergeBtn"), mergerStatusArea: $("#mergerStatusArea"),
         mergerStatusText: $("#mergerStatusText"), moveFilesCheck: $("#moveFilesCheck"),
-        // Modal
         imageModal: $("#imageModal"), modalImage: $("#modalImage"), modalTitle: $("#modalTitle"),
         closeModal: $("#closeModal"), prevBtn: $("#prevBtn"), nextBtn: $("#nextBtn"),
         copyBtn: $("#copyBtn"), copyGenBtn: $("#copyGenBtn"), downloadBtn: $("#downloadBtn"), openExplorerBtn: $("#openExplorerBtn"),
         deleteBtn: $("#deleteBtn"), favoriteBtn: $("#favoriteBtn"),
-        // Meta fields
+        imageCounter: $("#imageCounter"),
+        filmstrip: $("#filmstrip"),
+        bottomControlsWrapper: $("#bottomControlsWrapper"),
+        mainControlsBar: $("#mainControlsBar"),
+        toggleFilmstripBtn: $("#toggleFilmstripBtn"),
+        iconFilmstripOn: $("#iconFilmstripOn"),
+        iconFilmstripOff: $("#iconFilmstripOff"),
         promptContainer: $("#promptContainer"), paramsContainer: $("#paramsContainer"),
         valPositive: $("#valPositive"), valNegative: $("#valNegative"),
         valModel: $("#valModel"), valSampler: $("#valSampler"), valSteps: $("#valSteps"),
         valCfg: $("#valCfg"), valSeed: $("#valSeed"), valSize: $("#valSize"), valDate: $("#valDate"),
         copyPos: $("#copyPos"), copyNeg: $("#copyNeg"), copySeed: $("#copySeed"),
-        
         zoomIn: $("#zoomIn"), zoomOut: $("#zoomOut"), zoomReset: $("#zoomReset"),
         zoomControls: $("#zoomControls"), zoomLevelDisplay: $("#zoomLevel"),
         modalSidebar: $("#modalSidebar"), toggleImmersiveBtn: $("#toggleImmersiveBtn"),
         immersiveControls: $("#immersiveControls"), immCopy: $("#immCopy"), immDel: $("#immDel"), immExit: $("#immExit"),
-        // Slideshow
         immSlide: $("#immSlide"), immSlideIconPlay: $("#immSlideIconPlay"), immSlideIconPause: $("#immSlideIconPause"),
-        // Video
         videoContainer: $("#videoContainer"), modalVideo: $("#modalVideo"),
         vidPlayBtn: $("#vidPlayBtn"), iconPlay: $("#iconPlay"), iconPause: $("#iconPause"),
         vidTime: $("#vidTime"), vidProgress: $("#vidProgress"), vidMuteBtn: $("#vidMuteBtn"),
         iconVolOn: $("#iconVolOn"), iconVolOff: $("#iconVolOff"), vidVolume: $("#vidVolume"),
-        // Delete
         deleteConfirmModal: $("#deleteConfirmModal"), delFileName: $("#delFileName"),
         cancelDeleteBtn: $("#cancelDeleteBtn"), confirmDeleteBtn: $("#confirmDeleteBtn"),
-        // Help
         helpModal: $("#helpModal"), closeHelp: $("#closeHelp"),
-        // FAB
+        contextMenu: $("#contextMenu"), ctxImmersive: $("#ctxImmersive"), ctxCopy: $("#ctxCopy"), ctxFolder: $("#ctxFolder"), ctxDelete: $("#ctxDelete"), ctxFav: $("#ctxFav"),
         fabRandom: $("#fabRandom"), fabTop: $("#fabTop"),
         footer: $("footer"), fabContainer: $("#fabContainer"),
         toastContainer: $("#toastContainer")
@@ -108,12 +113,48 @@
     async function init() {
         updateTranslations();
         updateFitIcon();
+        updateBottomLayout();
+        injectExtraUI(); // New Feature: Inject "Copy Image" button
         await loadConfig();
         await loadFavorites();
         await loadList('');
         setupEventListeners();
+        setupFilmstripControls(); // Fix: Enable dragging and scrolling
         applyTheme(localStorage.getItem('cfs-theme') || 'system');
         setupFooterObserver();
+    }
+
+    function injectExtraUI() {
+        // Inject "Copy Image Data" button into context menu
+        const ctxCopy = document.getElementById('ctxCopy');
+        if (ctxCopy && !document.getElementById('ctxCopyImg')) {
+            const btn = document.createElement('button');
+            btn.id = 'ctxCopyImg';
+            btn.className = 'flex items-center gap-3 px-3 py-2.5 text-sm text-white rounded-lg hover:bg-white/10 transition-colors text-left group';
+            btn.innerHTML = `
+                <svg class="h-4 w-4 opacity-70 group-hover:text-green-400 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                <span>${state.currentLang === 'ru' ? 'Коп. картинку' : 'Copy Image'}</span>
+            `;
+            btn.onclick = () => {
+                if (state.contextMenuTargetIdx > -1) copyImageToClipboard(state.filteredImages[state.contextMenuTargetIdx]);
+                hideContextMenu();
+            };
+            ctxCopy.parentNode.insertBefore(btn, ctxCopy.nextSibling);
+        }
+    }
+
+    async function copyImageToClipboard(item) {
+        try {
+            const response = await fetch(item.url);
+            const blob = await response.blob();
+            await navigator.clipboard.write([
+                new ClipboardItem({ [blob.type]: blob })
+            ]);
+            showToast(state.currentLang === 'ru' ? 'Картинка скопирована!' : 'Image copied!', 'info');
+        } catch (err) {
+            console.error(err);
+            showToast(state.currentLang === 'ru' ? 'Ошибка копирования' : 'Copy failed', 'error');
+        }
     }
 
     async function loadFavorites() {
@@ -164,7 +205,6 @@
         const folders = state.listing.folders;
         const tplFolder = $("#tpl-folder-card");
         
-        // Hide folders in favorites mode
         if (fType !== 'favorites') {
             folders.forEach(f => {
                 const node = tplFolder.content.cloneNode(true);
@@ -215,21 +255,46 @@
         images.forEach((img, idx) => {
             const node = tplImg.content.cloneNode(true);
             const imgEl = node.querySelector('img');
+            const group = node.querySelector('.group');
+            const videoContainer = node.querySelector('.hover-video-container');
+            
             imgEl.src = EMPTY_PIXEL; 
             imgEl.dataset.thumb = img.thumb;
-            // Fit Mode
             if (state.fitMode === 'contain') {
                 imgEl.classList.remove('object-cover');
                 imgEl.classList.add('object-contain');
-                node.querySelector('.group').classList.remove('aspect-square');
-                node.querySelector('.group').classList.add('h-64');
+                group.classList.remove('aspect-square');
+                group.classList.add('h-64');
             }
 
-            if (img.type === 'video') node.querySelector('.video-indicator').classList.remove('hidden');
-            if (state.favorites.has(img.relPath)) node.querySelector('.favorite-indicator').classList.remove('hidden');
+            if (img.type === 'video') {
+                node.querySelector('.video-indicator').classList.remove('hidden');
+                group.onmouseenter = () => {
+                    if(videoContainer.querySelector('video')) return;
+                    const vid = document.createElement('video');
+                    vid.src = img.url;
+                    vid.muted = true;
+                    vid.autoplay = true;
+                    vid.loop = true;
+                    vid.className = "w-full h-full object-cover absolute inset-0 fade-in";
+                    if(state.fitMode === 'contain') vid.classList.add('object-contain');
+                    else vid.classList.add('object-cover');
+                    videoContainer.appendChild(vid);
+                };
+                group.onmouseleave = () => videoContainer.innerHTML = '';
+            }
+            
+            const isFav = state.favorites.has(img.relPath);
+            if (isFav) node.querySelector('.favorite-indicator').classList.remove('hidden');
 
             node.querySelector('.name-label').textContent = img.name;
-            node.querySelector('.group').onclick = () => openModal(idx);
+            
+            group.onclick = () => openModal(idx);
+            group.oncontextmenu = (e) => {
+                e.preventDefault();
+                showContextMenu(e, idx);
+            };
+
             io.observe(imgEl);
             el.gallery.appendChild(node);
         });
@@ -267,10 +332,72 @@
         el.themeSelect.value = theme;
     }
 
+    function showContextMenu(e, idx) {
+        state.contextMenuTargetIdx = idx;
+        const x = e.clientX;
+        const y = e.clientY;
+        
+        el.contextMenu.style.left = `${x}px`;
+        el.contextMenu.style.top = `${y}px`;
+        el.contextMenu.classList.remove('hidden');
+        
+        const rect = el.contextMenu.getBoundingClientRect();
+        if (rect.right > window.innerWidth) el.contextMenu.style.left = `${window.innerWidth - rect.width - 10}px`;
+        if (rect.bottom > window.innerHeight) el.contextMenu.style.top = `${window.innerHeight - rect.height - 10}px`;
+    }
+
+    function hideContextMenu() {
+        el.contextMenu.classList.add('hidden');
+        state.contextMenuTargetIdx = -1;
+    }
+    
+    document.addEventListener('click', (e) => {
+        if (!el.contextMenu.classList.contains('hidden')) hideContextMenu();
+    });
+
+    el.ctxImmersive.onclick = () => { 
+        if(state.contextMenuTargetIdx > -1) {
+             openModal(state.contextMenuTargetIdx).then(() => toggleImmersive(true));
+        }
+    };
+    el.ctxFav.onclick = () => {
+        if(state.contextMenuTargetIdx > -1) toggleFavoriteByIdx(state.contextMenuTargetIdx);
+    };
+    el.ctxCopy.onclick = async () => {
+        if(state.contextMenuTargetIdx === -1) return;
+        try {
+            await api('/api/copy', { method: 'POST', body: JSON.stringify({ relpath: state.filteredImages[state.contextMenuTargetIdx].relPath }) });
+            showToast(t('copied'), 'info');
+        } catch (e) { showToast(t('copyError'), 'error'); }
+    };
+    el.ctxFolder.onclick = () => {
+         if(state.contextMenuTargetIdx > -1)
+            api('/api/open_in_explorer', { method: 'POST', body: JSON.stringify({ relpath: state.filteredImages[state.contextMenuTargetIdx].relPath }) });
+    };
+    el.ctxDelete.onclick = () => {
+        if(state.contextMenuTargetIdx === -1) return;
+        const item = state.filteredImages[state.contextMenuTargetIdx];
+        confirmDelete(item.name, async () => {
+             try {
+                await api('/api/delete', { method: 'POST', body: JSON.stringify({ relpath: item.relPath }) });
+                state.filteredImages.splice(state.contextMenuTargetIdx, 1);
+                state.listing.images = state.listing.images.filter(i => i.relPath !== item.relPath);
+                renderGallery();
+                showToast(t('delBtn'), 'info');
+            } catch (e) { showToast(t('deleteError'), 'error'); }
+        });
+    };
+
     async function openModal(idx) {
         if (idx < 0 || idx >= state.filteredImages.length) return;
         state.currentIndex = idx;
         
+        updateImageCounter();
+        
+        if (state.showFilmstrip) {
+            buildFilmstrip();
+        }
+
         if (state.isImmersive) {
             el.imageModal.classList.add('immersive-active');
         }
@@ -281,8 +408,128 @@
         await updateModalContent(state.filteredImages[idx]);
     }
     
+    // --- NEW: Enhanced Filmstrip Feature ---
+    function buildFilmstrip() {
+        if (!state.showFilmstrip) return;
+        
+        el.filmstrip.innerHTML = '';
+        const fragment = document.createDocumentFragment();
+        
+        state.filteredImages.forEach((item, i) => {
+            const img = document.createElement('img');
+            img.src = item.thumb;
+            img.loading = "lazy";
+            img.className = `filmstrip-thumb w-12 h-12 md:w-16 md:h-16 object-cover rounded-md cursor-pointer border-2 border-transparent flex-shrink-0 select-none`;
+            img.dataset.index = i;
+            img.draggable = false;
+            
+            img.onclick = (e) => {
+                if (state.isFilmstripDragging) return;
+                e.stopPropagation();
+                state.currentIndex = i;
+                updateImageCounter();
+                updateFilmstripActive();
+                updateModalContent(state.filteredImages[i]);
+            };
+            fragment.appendChild(img);
+        });
+        
+        el.filmstrip.appendChild(fragment);
+        updateFilmstripActive();
+    }
+
+    function updateFilmstripActive() {
+        if (!state.showFilmstrip) return;
+        
+        const thumbs = el.filmstrip.querySelectorAll('.filmstrip-thumb');
+        thumbs.forEach(t => t.classList.remove('active'));
+        
+        const activeThumb = thumbs[state.currentIndex];
+        if (activeThumb) {
+            activeThumb.classList.add('active');
+            // Improved centering logic
+            const container = el.filmstrip;
+            const scrollPos = activeThumb.offsetLeft - (container.clientWidth / 2) + (activeThumb.clientWidth / 2);
+            container.scrollTo({ left: scrollPos, behavior: 'smooth' });
+        }
+    }
+
+    function setupFilmstripControls() {
+        // Mouse Wheel horizontal scroll
+        el.filmstrip.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            el.filmstrip.scrollLeft += e.deltaY;
+        }, { passive: false });
+
+        // Drag-to-Scroll functionality
+        el.filmstrip.addEventListener('mousedown', (e) => {
+            state.isFilmstripDragging = false;
+            state.filmstripStartX = e.pageX - el.filmstrip.offsetLeft;
+            state.filmstripScrollLeft = el.filmstrip.scrollLeft;
+            
+            const onMove = (e) => {
+                state.isFilmstripDragging = true;
+                e.preventDefault();
+                const x = e.pageX - el.filmstrip.offsetLeft;
+                const walk = (x - state.filmstripStartX) * 1.5; // Drag speed
+                el.filmstrip.scrollLeft = state.filmstripScrollLeft - walk;
+            };
+            
+            const onUp = () => {
+                window.removeEventListener('mousemove', onMove);
+                window.removeEventListener('mouseup', onUp);
+                setTimeout(() => { state.isFilmstripDragging = false; }, 50);
+            };
+            
+            window.addEventListener('mousemove', onMove);
+            window.addEventListener('mouseup', onUp);
+        });
+    }
+
+    function toggleFilmstripVisibility() {
+        state.showFilmstrip = !state.showFilmstrip;
+        localStorage.setItem('cfs-filmstrip', state.showFilmstrip);
+        updateBottomLayout();
+        if(state.showFilmstrip && el.filmstrip.innerHTML === '') {
+            buildFilmstrip();
+        }
+    }
+
+    function updateBottomLayout() {
+        if (state.showFilmstrip) {
+            el.filmstrip.classList.remove('hidden');
+            el.iconFilmstripOn.classList.remove('hidden');
+            el.iconFilmstripOff.classList.add('hidden');
+            
+            if (state.isImmersive) {
+                el.bottomControlsWrapper.classList.remove('justify-center');
+                el.bottomControlsWrapper.classList.add('justify-between');
+                el.mainControlsBar.classList.remove('mx-auto');
+            } else {
+                el.bottomControlsWrapper.classList.remove('justify-between');
+                el.bottomControlsWrapper.classList.add('justify-center');
+                 if (window.innerWidth <= 768) {
+                    el.bottomControlsWrapper.classList.add('flex-col', 'items-center');
+                 }
+            }
+        } else {
+            el.filmstrip.classList.add('hidden');
+            el.iconFilmstripOn.classList.add('hidden');
+            el.iconFilmstripOff.classList.remove('hidden');
+            
+            el.bottomControlsWrapper.classList.remove('justify-between', 'flex-col');
+            el.bottomControlsWrapper.classList.add('justify-center');
+            el.mainControlsBar.classList.add('mx-auto');
+        }
+    }
+
+    function updateImageCounter() {
+        el.imageCounter.textContent = `${state.currentIndex + 1} / ${state.filteredImages.length}`;
+    }
+    
     async function updateModalContent(item) {
         resetZoom();
+        if (state.showFilmstrip) updateFilmstripActive();
         
         el.modalVideo.pause();
         el.modalImage.src = ""; 
@@ -301,6 +548,9 @@
             state.currentMeta = meta;
             
             if (meta.type === 'video') {
+                // FIX: Hide filmstrip for videos
+                el.filmstrip.classList.add('hidden'); 
+                
                 el.videoContainer.style.display = "flex";
                 el.zoomControls.classList.add('hidden');
                 el.modalVideo.src = meta.url;
@@ -315,8 +565,14 @@
                 });
 
             } else {
+                // FIX: Restore filmstrip if enabled
+                if (state.showFilmstrip) el.filmstrip.classList.remove('hidden');
+
                 el.modalImage.style.display = "block";
-                el.zoomControls.classList.remove('hidden');
+                if(!el.zoomControls.classList.contains('hidden') || !state.isImmersive) {
+                     el.zoomControls.classList.remove('hidden'); 
+                }
+                
                 el.promptContainer.classList.remove('hidden');
                 $$('#paramsContainer .meta-field').forEach(div => div.classList.remove('hidden'));
 
@@ -355,14 +611,19 @@
 
     async function toggleFavorite() {
         if (state.currentIndex === -1) return;
-        const item = state.filteredImages[state.currentIndex];
+        toggleFavoriteByIdx(state.currentIndex);
+    }
+    
+    async function toggleFavoriteByIdx(idx) {
+        const item = state.filteredImages[idx];
         const relPath = item.relPath;
         try {
             const res = await api('/api/favorites', { method: 'POST', body: JSON.stringify({ relpath: relPath }) });
             if (res.isFavorite) state.favorites.add(relPath);
             else state.favorites.delete(relPath);
-            updateFavoriteBtn(relPath);
-            renderGallery(); // Refresh gallery icons
+            
+            if(state.currentIndex === idx) updateFavoriteBtn(relPath);
+            renderGallery(); 
         } catch (e) { console.error(e); }
     }
 
@@ -374,7 +635,6 @@
         stopSlideshow();
     }
 
-    // --- Merger Logic ---
     function updateMergerSources() {
         el.mergerSourcesList.innerHTML = '';
         if (state.mergerSources.length === 0) {
@@ -428,7 +688,6 @@
         }
     }
 
-    // --- Immersive Mode ---
     function toggleImmersive(forceState) {
         const newState = forceState !== undefined ? forceState : !state.isImmersive;
         state.isImmersive = newState;
@@ -438,6 +697,7 @@
             el.imageModal.classList.remove('immersive-active');
             stopSlideshow(); 
         }
+        updateBottomLayout();
     }
 
     function toggleFullScreen() {
@@ -448,7 +708,6 @@
         }
     }
 
-    // Video
     function updatePlayIcon(isPlaying) {
         if (isPlaying) { el.iconPlay.classList.add('hidden'); el.iconPause.classList.remove('hidden'); } 
         else { el.iconPlay.classList.remove('hidden'); el.iconPause.classList.add('hidden'); }
@@ -475,7 +734,6 @@
         else { el.iconVolOn.classList.remove('hidden'); el.iconVolOff.classList.add('hidden'); }
     }
 
-    // Delete
     function confirmDelete(filename, onConfirm) {
         el.delFileName.textContent = filename;
         state.deleteCallback = onConfirm;
@@ -495,6 +753,7 @@
             return;
         }
         state.currentIndex = nextIdx;
+        updateImageCounter();
         if (smooth) {
              el.modalImage.classList.add('opacity-0');
              setTimeout(() => {
@@ -506,7 +765,9 @@
             updateModalContent(state.filteredImages[state.currentIndex]);
         }
     }
-    function prevImage() { openModal(state.currentIndex - 1); }
+    function prevImage() { 
+        openModal(state.currentIndex - 1); 
+    }
 
     function updateTransform() {
         el.modalImage.style.transform = `translate(${state.imageX}px, ${state.imageY}px) scale(${state.zoomLevel})`;
@@ -529,6 +790,7 @@
                 state.listing.images = state.listing.images.filter(i => i.relPath !== item.relPath);
                 if (state.filteredImages.length > 0) {
                     if (state.currentIndex >= state.filteredImages.length) state.currentIndex--;
+                    updateImageCounter();
                     updateModalContent(state.filteredImages[state.currentIndex]);
                     renderGallery(); 
                 } else { closeModal(); loadList(state.cwd); }
@@ -575,7 +837,6 @@
         window.scrollTo({ top: 0, behavior: 'smooth' });
     }
 
-    // --- SlideShow Logic ---
     el.immSlide.onclick = toggleSlideshow;
 
     function toggleSlideshow() {
@@ -595,7 +856,7 @@
         if (state.currentIndex === -1) openModal(0);
         
         state.slideshowInterval = setInterval(() => {
-            nextImage(true); // Smooth transition
+            nextImage(true);
         }, 4000);
     }
     function stopSlideshow() {
@@ -649,7 +910,19 @@
             $("#sortDirIcon").style.transform = state.sortDir === 'asc' ? 'rotate(180deg)' : 'rotate(0deg)';
             renderGallery();
         });
-        el.filterType.addEventListener('change', () => { state.filterType = el.filterType.value; renderGallery(); });
+
+        el.segmentBtns.forEach(btn => {
+            btn.onclick = () => {
+                el.segmentBtns.forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                state.filterType = btn.dataset.filter;
+                if (state.filterType !== 'favorites' && state.filterType !== 'all') {
+                    el.favFilterBtn.classList.remove('text-red-500', 'bg-red-500/10');
+                }
+                renderGallery();
+            };
+        });
+
         el.thumbSize.addEventListener('input', (e) => { localStorage.setItem('cfs-thumb', e.target.value); updateGridColumns(e.target.value); });
         el.fitToggleBtn.onclick = toggleFitMode;
         el.logoBtn.onclick = () => loadList('');
@@ -657,21 +930,22 @@
         el.fullscreenBtn.onclick = toggleFullScreen;
         el.helpBtn.onclick = () => el.helpModal.classList.remove('hidden');
         el.closeHelp.onclick = () => el.helpModal.classList.add('hidden');
+        el.toggleFilmstripBtn.onclick = toggleFilmstripVisibility;
         
         el.favFilterBtn.onclick = () => {
              if(state.filterType === 'favorites') {
                  state.filterType = 'all';
-                 el.filterType.value = 'all';
+                 el.segmentBtns.forEach(b => b.classList.remove('active'));
+                 el.segmentBtns[0].classList.add('active');
                  el.favFilterBtn.classList.remove('text-red-500', 'bg-red-500/10');
              } else {
                  state.filterType = 'favorites';
-                 el.filterType.value = 'favorites';
+                 el.segmentBtns.forEach(b => b.classList.remove('active'));
                  el.favFilterBtn.classList.add('text-red-500', 'bg-red-500/10');
              }
              renderGallery();
         };
 
-        // Settings
         el.settingsBtn.onclick = () => {
             el.modalThumbSize.value = el.thumbSize.value; el.modalThumbValue.textContent = el.thumbSize.value + 'px';
             el.modalSortBy.value = state.sortBy; el.modalSortDir.value = state.sortDir;
@@ -694,7 +968,6 @@
             hideSettings();
         };
         
-        // Clear Cache Modal
         el.clearCacheBtn.onclick = () => el.cacheConfirmModal.classList.remove('hidden');
         el.cancelCacheBtn.onclick = () => el.cacheConfirmModal.classList.add('hidden');
         el.confirmCacheBtn.onclick = async () => {
@@ -704,7 +977,6 @@
              loadList('');
         };
 
-        // Merger
         el.mergerBtn.onclick = () => el.mergerModal.classList.remove('hidden');
         el.closeMerger.onclick = () => el.mergerModal.classList.add('hidden');
         el.mergerModal.onclick = (e) => { if(e.target === el.mergerModal) el.mergerModal.classList.add('hidden'); };
@@ -715,10 +987,10 @@
         el.mergerSelectDest.onclick = () => selectFolder(el.mergerDestInput);
         el.startMergeBtn.onclick = startMerge;
 
-        // Modal Image
         el.prevBtn.onclick = (e) => { e.stopPropagation(); prevImage(); };
         el.nextBtn.onclick = (e) => { e.stopPropagation(); nextImage(); };
         el.closeModal.onclick = closeModal;
+        
         document.addEventListener('keydown', e => {
             if (el.imageModal.classList.contains('hidden')) return;
             if (e.key === 'Escape') {
@@ -726,9 +998,24 @@
                 else closeModal();
             }
             if (e.key === 'f' || e.key === 'F') toggleImmersive();
+            if (e.key === 'v' || e.key === 'V') toggleFilmstripVisibility();
             if (e.key === 'ArrowLeft') prevImage();
             if (e.key === 'ArrowRight') nextImage();
             if (e.key === 'Delete' && el.deleteConfirmModal.classList.contains('hidden')) deleteCurrent();
+            
+            // Enhanced Navigation
+            if (e.key === 'Home') openModal(0);
+            if (e.key === 'End') openModal(state.filteredImages.length - 1);
+            if (e.key === 'r' || e.key === 'R') pickRandomImage();
+            if (e.key === ' ') {
+                e.preventDefault();
+                const item = state.filteredImages[state.currentIndex];
+                if (item.type === 'video') {
+                    if (el.modalVideo.paused) el.modalVideo.play(); else el.modalVideo.pause();
+                } else {
+                    toggleSlideshow();
+                }
+            }
         });
 
         el.copyBtn.onclick = copyFile; 
@@ -744,10 +1031,21 @@
         el.zoomIn.onclick = (e) => { e.stopPropagation(); handleZoom(0.25); };
         el.zoomOut.onclick = (e) => { e.stopPropagation(); handleZoom(-0.25); };
         el.zoomReset.onclick = (e) => { e.stopPropagation(); resetZoom(); };
+        
         el.modalImage.addEventListener('wheel', (e) => { if (!el.imageModal.classList.contains('hidden')) { e.preventDefault(); handleZoom(e.deltaY < 0 ? 0.1 : -0.1); }});
         el.modalImage.addEventListener('mousedown', e => { if (state.zoomLevel > 1) { e.preventDefault(); state.isDragging = true; state.startX = e.clientX - state.imageX; state.startY = e.clientY - state.imageY; el.modalImage.style.cursor = 'grabbing'; }});
         window.addEventListener('mouseup', () => { state.isDragging = false; if(state.zoomLevel > 1) el.modalImage.style.cursor = 'grab'; });
         window.addEventListener('mousemove', e => { if (state.isDragging) { e.preventDefault(); state.imageX = e.clientX - state.startX; state.imageY = e.clientY - state.startY; updateTransform(); }});
+        
+        // Double click zoom
+        el.modalImage.addEventListener('dblclick', (e) => {
+            e.preventDefault();
+            if (state.zoomLevel !== 1) resetZoom();
+            else {
+                state.zoomLevel = 2.5;
+                updateTransform();
+            }
+        });
         
         el.toggleImmersiveBtn.onclick = () => toggleImmersive();
         el.immExit.onclick = () => toggleImmersive(false);

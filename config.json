@@ -1,4 +1,6 @@
 {
+  "output_dir": "C:\\android\\Best Generation EasyImage",
+  "copies_dir": "C:\\android\\Top Image",
   "host": "127.0.0.1",
   "port": 7865
 }
